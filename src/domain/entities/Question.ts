@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { Schema } from 'mongoose';
 
 export interface Question {
@@ -8,6 +7,7 @@ export interface Question {
   difficulty: QuestionDifficulty;
   roles: string[];
   keywords: string[];
+  language: string; // Adicionado campo de idioma
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,9 +22,14 @@ export const QuestionSchema = new Schema({
   id: { type: String, required: true },
   content: { type: String, required: true },
   category: { type: String, required: true },
-  difficulty: { type: String, enum: Object.values(QuestionDifficulty), required: true },
+  difficulty: { 
+    type: String, 
+    enum: Object.values(QuestionDifficulty), 
+    required: true 
+  },
   roles: [{ type: String }],
-  keywords: [String],
+  keywords: [{ type: String }],
+  language: { type: String, required: true }, // Adicionado campo de idioma
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

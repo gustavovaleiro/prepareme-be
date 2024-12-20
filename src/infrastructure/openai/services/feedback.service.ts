@@ -1,23 +1,24 @@
 import { inject, injectable } from 'inversify';
-import { Answer } from '../../domain/entities/Interview';
-import { IFeedbackService, FeedbackResult } from '../../domain/services/IFeedbackService';
-import { OpenAIService } from './OpenAIService';
-import { logger } from '../logging';
+import { Answer } from '../../../domain/entities/Interview';
+import { IFeedbackService, FeedbackResult } from '../../../domain/services/IFeedbackService';
+import { OpenAIClient } from './openai.client';
+import { createFeedbackPrompt } from '../prompts/feedback.prompt';
+import { logger } from '../../logging';
 
 @injectable()
 export class OpenAIFeedbackService implements IFeedbackService {
-  private openAIService: OpenAIService;
+  private openAIClient: OpenAIClient;
 
   constructor() {
-    this.openAIService = OpenAIService.getInstance();
+    this.openAIClient = OpenAIClient.getInstance();
   }
 
   async analyzeFeedback(
-    answers: Answer[], 
+    answers: Answer[],
     expectedAnswers: Record<string, string>
   ): Promise<FeedbackResult> {
     try {
-      const analysisPromises = answers.map(answer => 
+      const analysisPromises = answers.map(answer =>
         this.analyzeAnswer(answer, expectedAnswers[answer.questionId])
       );
 
@@ -30,16 +31,8 @@ export class OpenAIFeedbackService implements IFeedbackService {
   }
 
   private async analyzeAnswer(answer: Answer, expectedAnswer: string): Promise<any> {
-    const prompt = `Compare the following answer with the expected answer:
-      Candidate's answer: ${answer.content}
-      Expected answer: ${expectedAnswer}
-      
-      Provide a JSON response with:
-      - score (0-100)
-      - strengths (array of strings)
-      - improvements (array of strings)`;
-
-    const response = await this.openAIService.createCompletion(prompt);
+    const prompt = createFeedbackPrompt(answer.content, expectedAnswer);
+    const response = await this.openAIClient.createCompletion(prompt);
     return this.parseAIResponse(response);
   }
 
@@ -71,12 +64,11 @@ export class OpenAIFeedbackService implements IFeedbackService {
   }
 
   private calculateCategoryScores(analyses: any[]): Record<string, number> {
-    // Implementação do cálculo de scores por categoria
     return {};
   }
 
   private generateRecommendations(improvements: string[]): string[] {
-    return improvements.map(improvement => 
+    return improvements.map(improvement =>
       `Study more about: ${improvement}`
     );
   }

@@ -10,10 +10,11 @@ export class MongoQuestionRepository implements QuestionRepository {
     return question ? question.toObject() : null;
   }
 
-  async findByRoleAndLevel(role: string, level: string): Promise<Question[]> {
+  async findByRoleAndLevel(role: string, level: string, language: string): Promise<Question[]> {
     const questions = await this.model.find({
       roles: role,
-      difficulty: level
+      difficulty: level,
+      language
     });
     return questions.map(q => q.toObject());
   }

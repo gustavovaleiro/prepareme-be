@@ -4,6 +4,9 @@ import { AppError } from './errorHandler';
 
 const initiateInterviewSchema = Joi.object({
   userId: Joi.string().required(),
+  userEmail: Joi.string().email().required(),
+  userNumber: Joi.string().required(),
+  interviewLanguage: Joi.string().required(),
   role: Joi.string().required(),
   level: Joi.string().required()
 });
