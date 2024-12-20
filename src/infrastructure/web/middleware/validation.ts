@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
-import { AppError } from './errorHandler';
+import { ValidationError } from '../../errors/ApplicationError';
 
 const initiateInterviewSchema = Joi.object({
-  userId: Joi.string().required(),
+  userId: Joi.string().uuid().required(),
   userEmail: Joi.string().email().required(),
   userNumber: Joi.string().required(),
   interviewLanguage: Joi.string().required(),
@@ -12,13 +12,12 @@ const initiateInterviewSchema = Joi.object({
 });
 
 const submitAnswersSchema = Joi.object({
-  interviewId: Joi.string().required(),
   answers: Joi.array().items(
     Joi.object({
-      questionId: Joi.string().required(),
-      content: Joi.string().required()
+      questionId: Joi.string().uuid().required(),
+      content: Joi.string().min(1).max(10000).required()
     })
-  ).required()
+  ).min(1).required()
 });
 
 export const validateInitiateInterview = (
@@ -28,7 +27,7 @@ export const validateInitiateInterview = (
 ) => {
   const { error } = initiateInterviewSchema.validate(req.body);
   if (error) {
-    throw new AppError(400, error.details[0].message);
+    throw new ValidationError(error.details[0].message);
   }
   next();
 };
@@ -40,7 +39,7 @@ export const validateSubmitAnswers = (
 ) => {
   const { error } = submitAnswersSchema.validate(req.body);
   if (error) {
-    throw new AppError(400, error.details[0].message);
+    throw new ValidationError(error.details[0].message);
   }
   next();
 };

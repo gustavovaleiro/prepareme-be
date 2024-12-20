@@ -16,7 +16,7 @@ export class InitiateInterviewUseCase {
   ) {}
 
   async execute(request: any): Promise<Interview> {
-    const interviewId = uuidv4();
+    const interviewId = uuidv4(); // Generate UUID for new interview
     
     logger.info(`${LOG_MESSAGES.INTERVIEW.INITIATED}`, {
       interviewId,

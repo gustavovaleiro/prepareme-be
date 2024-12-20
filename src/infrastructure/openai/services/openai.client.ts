@@ -1,6 +1,9 @@
 import OpenAI from 'openai';
 import { env } from '../../config/env';
-import { logger } from '../../logging';
+import { createLogger } from '../../logging/Logger';
+import { ExternalServiceError } from '../../errors/ApplicationError';
+
+const logger = createLogger('OpenAIClient');
 
 export class OpenAIClient {
   private static instance: OpenAIClient;
@@ -30,6 +33,13 @@ export class OpenAIClient {
     }
 
     try {
+      logger.info('Sending request to OpenAI', {
+        model: env.OPENAI_MODEL,
+        maxTokens: env.OPENAI_MAX_TOKENS,
+        prompt
+      });
+
+      const startTime = Date.now();
       const response = await this.openai.chat.completions.create({
         model: env.OPENAI_MODEL,
         messages: [
@@ -47,25 +57,40 @@ export class OpenAIClient {
         response_format: { type: "json_object" }
       });
 
+      const duration = Date.now() - startTime;
       const content = response.choices[0].message.content;
+
       if (!content) {
-        throw new Error('Empty response from OpenAI');
+        throw new ExternalServiceError('OpenAI', 'Empty response received');
       }
 
       // Validate JSON
-      JSON.parse(content);
+      const parsedResponse = JSON.parse(content);
+
+      logger.info('Received response from OpenAI', {
+        duration,
+        usage: response.usage,
+        response: parsedResponse
+      });
+
       return content;
     } catch (error) {
-      logger.error('OpenAI API error:', error);
-      return this.getMockResponse();
+      if (error instanceof Error) {
+        logger.error('OpenAI API error', error, { prompt });
+        throw new ExternalServiceError('OpenAI', error.message);
+      }
+      throw new ExternalServiceError('OpenAI', 'Unknown error occurred');
     }
   }
 
   private getMockResponse(): string {
-    return JSON.stringify({
+    const mockResponse = {
       score: 70,
       strengths: ['Good understanding of basic concepts'],
       improvements: ['Could provide more detailed examples']
-    });
+    };
+    
+    logger.debug('Returning mock response', { response: mockResponse });
+    return JSON.stringify(mockResponse);
   }
 }

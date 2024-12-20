@@ -7,7 +7,7 @@ export interface Question {
   difficulty: QuestionDifficulty;
   roles: string[];
   keywords: string[];
-  language: string; // Adicionado campo de idioma
+  language: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,8 +18,8 @@ export enum QuestionDifficulty {
   ADVANCED = 'advanced',
 }
 
-export const QuestionSchema = new Schema({
-  id: { type: String, required: true },
+export const QuestionSchema = new Schema<Question>({
+  id: { type: String, required: true, unique: true },
   content: { type: String, required: true },
   category: { type: String, required: true },
   difficulty: { 
@@ -29,7 +29,10 @@ export const QuestionSchema = new Schema({
   },
   roles: [{ type: String }],
   keywords: [{ type: String }],
-  language: { type: String, required: true }, // Adicionado campo de idioma
+  language: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
+
+// Criar índice no campo id
+QuestionSchema.index({ id: 1 }, { unique: true });

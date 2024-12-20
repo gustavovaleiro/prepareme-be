@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { InterviewController } from '../controllers/InterviewController';
 import { validateInitiateInterview, validateSubmitAnswers } from '../middleware/validation';
 import { rateLimit } from 'express-rate-limit';
+import { timeout } from '../middleware/timeout';
 
 const interviewLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -12,71 +13,6 @@ export const configureInterviewRoutes = (
   router: Router,
   controller: InterviewController
 ) => {
-  /**
-   * @swagger
-   * components:
-   *   schemas:
-   *     InterviewRequest:
-   *       type: object
-   *       required:
-   *         - userId
-   *         - userEmail
-   *         - userNumber
-   *         - interviewLanguage
-   *         - role
-   *         - level
-   *       properties:
-   *         userId:
-   *           type: string
-   *           format: uuid
-   *         userEmail:
-   *           type: string
-   *           format: email
-   *         userNumber:
-   *           type: string
-   *         interviewLanguage:
-   *           type: string
-   *           enum: [en, pt, es]
-   *         role:
-   *           type: string
-   *           example: "frontend-developer"
-   *         level:
-   *           type: string
-   *           enum: [beginner, intermediate, advanced]
-   *     
-   *     Interview:
-   *       type: object
-   *       properties:
-   *         id:
-   *           type: string
-   *           format: uuid
-   *         status:
-   *           type: string
-   *           enum: [pending, in_progress, completed]
-   *         questions:
-   *           type: array
-   *           items:
-   *             $ref: '#/components/schemas/Question'
-   *     
-   *     Question:
-   *       type: object
-   *       properties:
-   *         id:
-   *           type: string
-   *           format: uuid
-   *         content:
-   *           type: string
-   *         category:
-   *           type: string
-   *         difficulty:
-   *           type: string
-   *           enum: [beginner, intermediate, advanced]
-   *         keywords:
-   *           type: array
-   *           items:
-   *             type: string
-   */
-
   /**
    * @swagger
    * /api/v1/interviews:
@@ -105,22 +41,24 @@ export const configureInterviewRoutes = (
     '/api/v1/interviews',
     interviewLimiter,
     validateInitiateInterview,
+    timeout(5000),
     controller.initiateInterview.bind(controller)
   );
 
   /**
    * @swagger
-   * /api/v1/interviews/{interviewId}/submit:
+   * /api/v1/interviews/{interviewId}/answers:
    *   post:
    *     summary: Submit answers for an interview
    *     tags: [Interviews]
    *     parameters:
    *       - in: path
    *         name: interviewId
-   *         required: true
    *         schema:
    *           type: string
    *           format: uuid
+   *         required: true
+   *         description: UUID of the interview
    *     requestBody:
    *       required: true
    *       content:
@@ -141,9 +79,12 @@ export const configureInterviewRoutes = (
    *                     questionId:
    *                       type: string
    *                       format: uuid
+   *                       description: UUID of the question being answered
    *                     content:
    *                       type: string
    *                       minLength: 1
+   *                       maxLength: 10000
+   *                       description: The answer content
    *     responses:
    *       200:
    *         description: Answers submitted successfully
@@ -152,40 +93,41 @@ export const configureInterviewRoutes = (
    *             schema:
    *               type: object
    *               properties:
-   *                 feedback:
-   *                   type: object
-   *                   properties:
-   *                     overallScore:
-   *                       type: number
-   *                       minimum: 0
-   *                       maximum: 100
-   *                     categoryScores:
-   *                       type: object
-   *                       additionalProperties:
-   *                         type: number
-   *                     strengths:
-   *                       type: array
-   *                       items:
+   *                 id:
+   *                   type: string
+   *                   format: uuid
+   *                 status:
+   *                   type: string
+   *                   enum: [completed]
+   *                 answers:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       questionId:
    *                         type: string
-   *                     improvements:
-   *                       type: array
-   *                       items:
+   *                         format: uuid
+   *                       content:
    *                         type: string
-   *                     recommendations:
-   *                       type: array
-   *                       items:
+   *                       submittedAt:
    *                         type: string
+   *                         format: date-time
    *       400:
-   *         description: Invalid submission
+   *         description: Invalid submission format or data
    *       404:
    *         description: Interview not found
+   *       422:
+   *         description: Invalid question IDs
    *       429:
    *         description: Too many requests
+   *       500:
+   *         description: Internal server error
    */
   router.post(
-    '/api/v1/interviews/:interviewId/submit',
+    '/api/v1/interviews/:interviewId/answers',
     interviewLimiter,
     validateSubmitAnswers,
+    timeout(5000),
     controller.submitAnswers.bind(controller)
   );
 };

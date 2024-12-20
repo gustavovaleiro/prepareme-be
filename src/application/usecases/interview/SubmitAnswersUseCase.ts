@@ -1,8 +1,10 @@
 import { inject, injectable } from 'inversify';
 import { Interview, InterviewStatus } from '../../../domain/entities/Interview';
 import { InterviewRepository } from '../../../domain/repositories/InterviewRepository';
-import { QuestionRepository } from '../../../domain/repositories/QuestionRepository';
-import { IFeedbackService } from '../../../domain/services/IFeedbackService';
+import { NotFoundError, ValidationError } from '../../../infrastructure/errors/ApplicationError';
+import { createLogger } from '../../../infrastructure/logging/Logger';
+
+const logger = createLogger('SubmitAnswersUseCase');
 
 export interface SubmitAnswersRequest {
   interviewId: string;
@@ -16,56 +18,52 @@ export interface SubmitAnswersRequest {
 export class SubmitAnswersUseCase {
   constructor(
     @inject('InterviewRepository')
-    private interviewRepository: InterviewRepository,
-    @inject('QuestionRepository')
-    private questionRepository: QuestionRepository,
-    @inject('FeedbackService')
-    private feedbackService: IFeedbackService
+    private interviewRepository: InterviewRepository
   ) {}
 
   async execute(request: SubmitAnswersRequest): Promise<Interview> {
+    logger.info('Processing answer submission', { interviewId: request.interviewId });
+
+    // Buscar a entrevista
     const interview = await this.interviewRepository.findById(request.interviewId);
     if (!interview) {
-      throw new Error('Interview not found');
+      throw new NotFoundError('Interview', request.interviewId);
     }
 
-    const questions = await Promise.all(
-      interview.questions.map(q => this.questionRepository.findById(q.id))
-    );
+    // Validar se todas as questões pertencem à entrevista
+    const questionIds = interview.questions.map(q => q.id);
+    const invalidQuestions = request.answers.filter(a => !questionIds.includes(a.questionId));
+    
+    if (invalidQuestions.length > 0) {
+      throw new ValidationError(
+        'Invalid question IDs provided',
+        { invalidQuestionIds: invalidQuestions.map(q => q.questionId) }
+      );
+    }
 
-    const expectedAnswers = questions.reduce((acc, q) => {
-      if (q) {
-        acc[q.id] = q.content; // Usando o content como resposta esperada
-      }
-      return acc;
-    }, {} as Record<string, string>);
-
+    // Formatar as respostas com timestamp
     const formattedAnswers = request.answers.map(answer => ({
       questionId: answer.questionId,
       content: answer.content,
       submittedAt: new Date()
     }));
 
-    const feedback = await this.feedbackService.analyzeFeedback(
-      formattedAnswers,
-      expectedAnswers
-    );
-
-    const updatedInterview: Partial<Interview> = {
+    // Atualizar a entrevista
+    const updatedInterview = await this.interviewRepository.update(interview.id, {
       status: InterviewStatus.COMPLETED,
       answers: formattedAnswers,
-      feedback: {
-        ...feedback,
-        generatedAt: new Date()
-      },
       updatedAt: new Date()
-    };
+    });
 
-    const result = await this.interviewRepository.update(interview.id, updatedInterview);
-    if (!result) {
+    if (!updatedInterview) {
       throw new Error('Failed to update interview');
     }
 
-    return result;
+    logger.info('Answer submission completed', { 
+      interviewId: request.interviewId,
+      answersCount: formattedAnswers.length
+    });
+
+    return updatedInterview;
   }
 }

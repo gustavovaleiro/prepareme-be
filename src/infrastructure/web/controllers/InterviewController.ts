@@ -2,7 +2,10 @@ import { inject, injectable } from 'inversify';
 import { Request, Response } from 'express';
 import { InitiateInterviewUseCase } from '../../../application/usecases/interview/InitiateInterviewUseCase';
 import { SubmitAnswersUseCase } from '../../../application/usecases/interview/SubmitAnswersUseCase';
-import { AppError } from '../middleware/errorHandler';
+import { ValidationError } from '../../errors/ApplicationError';
+import { createLogger } from '../../logging/Logger';
+
+const logger = createLogger('InterviewController');
 
 @injectable()
 export class InterviewController {
@@ -18,7 +21,7 @@ export class InterviewController {
       const { userId, userEmail, userNumber, interviewLanguage, role, level } = req.body;
       
       if (!interviewLanguage) {
-        throw new AppError(400, 'Interview language is required');
+        throw new ValidationError('Interview language is required');
       }
 
       const interview = await this.initiateInterviewUseCase.execute({
@@ -32,20 +35,28 @@ export class InterviewController {
       
       res.status(201).json(interview);
     } catch (error) {
-      throw new AppError(400, error instanceof Error ? error.message : 'Failed to initiate interview');
+      // Propaga o erro para o error handler global
+      throw error;
     }
   }
 
   async submitAnswers(req: Request, res: Response): Promise<void> {
     try {
-      const { interviewId, answers } = req.body;
+      const { interviewId } = req.params;
+      const { answers } = req.body;
+
+      logger.info('Processing answer submission', { interviewId });
+
       const result = await this.submitAnswersUseCase.execute({
         interviewId,
         answers
       });
+
+      // Se chegou aqui, a operação foi bem sucedida
       res.status(200).json(result);
     } catch (error) {
-      throw new AppError(400, error instanceof Error ? error.message : 'Failed to submit answers');
+      // Propaga o erro para o error handler global
+      throw error;
     }
   }
 }
